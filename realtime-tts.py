@@ -19,7 +19,7 @@ def get_tts_pipeline():
     """
     return pipeline("text-to-speech", model="microsoft/speecht5_tts")
 
-# Function to adjust audio pitch and speed
+# Function to adjust audio pitch and speed independently
 def adjust_audio(audio_data, pitch_semitones=0.0, speed_factor=1.0):
     try:
         # Check if the input is a numpy array (raw audio data)
@@ -38,15 +38,18 @@ def adjust_audio(audio_data, pitch_semitones=0.0, speed_factor=1.0):
             # Handle other cases, assuming it's already in WAV format
             audio = AudioSegment.from_wav(io.BytesIO(audio_data))
 
+        # Adjust speed
+        if speed_factor != 1.0:
+            new_frame_rate = int(audio.frame_rate * speed_factor)
+            audio = audio._spawn(audio.raw_data, overrides={'frame_rate': new_frame_rate})
+            audio = audio.set_frame_rate(audio.frame_rate)  # Ensure proper frame rate after speed change
+
         # Adjust pitch
         if pitch_semitones != 0.0:
             audio = audio._spawn(audio.raw_data, overrides={
                 "frame_rate": int(audio.frame_rate * (2 ** (pitch_semitones / 12.0)))
             })
-
-        # Adjust speed
-        if speed_factor != 1.0:
-            audio = audio.speedup(playback_speed=speed_factor)
+            audio = audio.set_frame_rate(audio.frame_rate)  # Ensure proper frame rate after pitch adjustment
 
         # Export to WAV format
         with io.BytesIO() as buf:
